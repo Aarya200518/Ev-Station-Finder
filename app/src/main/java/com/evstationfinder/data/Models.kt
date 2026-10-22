@@ -32,11 +32,12 @@ data class VehicleEntity(
 
 @Entity(tableName = "profile")
 data class ProfileEntity(
-    @PrimaryKey val id: Int = 1,
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val name: String,
     val email: String,
     val phone: String,
-    val savedLocation: String
+    val savedLocation: String,
+    val isActive: Boolean = false
 )
 
 @Entity(tableName = "bookings")

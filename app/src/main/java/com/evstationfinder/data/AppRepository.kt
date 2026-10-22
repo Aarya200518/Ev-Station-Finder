@@ -6,7 +6,8 @@ class AppRepository(private val database: AppDatabase) {
     val stations: Flow<List<StationEntity>> = database.stationDao().observeAll()
     val vehicles: Flow<List<VehicleEntity>> = database.vehicleDao().observeAll()
     val bookings: Flow<List<BookingEntity>> = database.bookingDao().observeAll()
-    val profile: Flow<ProfileEntity?> = database.profileDao().observe()
+    val activeProfile: Flow<ProfileEntity?> = database.profileDao().observeActive()
+    val allProfiles: Flow<List<ProfileEntity>> = database.profileDao().observeAll()
 
     suspend fun seedIfNeeded() {
         database.stationDao().insertAll(
@@ -60,14 +61,60 @@ class AppRepository(private val database: AppDatabase) {
             )
         )
 
+        if (database.profileDao().count() == 0) {
+            database.profileDao().save(
+                ProfileEntity(
+                    id = 1,
+                    name = "Aarav Mehta",
+                    email = "aarav.mehta@email.com",
+                    phone = "+91 98765 43210",
+                    savedLocation = "Bandra Kurla Complex, Mumbai",
+                    isActive = true
+                )
+            )
+            database.profileDao().save(
+                ProfileEntity(
+                    id = 2,
+                    name = "Ananya Sharma",
+                    email = "ananya.sharma@email.com",
+                    phone = "+91 98123 45678",
+                    savedLocation = "Worli & Lower Parel, Mumbai",
+                    isActive = false
+                )
+            )
+            database.profileDao().save(
+                ProfileEntity(
+                    id = 3,
+                    name = "Rohan Verma",
+                    email = "rohan.verma@email.com",
+                    phone = "+91 99887 76655",
+                    savedLocation = "Connaught Place, New Delhi",
+                    isActive = false
+                )
+            )
+        }
+    }
+
+    suspend fun loginProfile(id: Int) {
+        database.profileDao().clearActive()
+        database.profileDao().setActive(id)
+    }
+
+    suspend fun createAndLoginProfile(name: String, email: String, phone: String, savedLocation: String) {
+        database.profileDao().clearActive()
         database.profileDao().save(
             ProfileEntity(
-                name = "Aarav Mehta",
-                email = "aarav.mehta@email.com",
-                phone = "+91 98765 43210",
-                savedLocation = "Bandra Kurla Complex, Mumbai"
+                name = name,
+                email = email,
+                phone = phone,
+                savedLocation = savedLocation,
+                isActive = true
             )
         )
+    }
+
+    suspend fun logout() {
+        database.profileDao().clearActive()
     }
 
     suspend fun reserve(draft: BookingDraft, paymentMethod: String): Result<String> {

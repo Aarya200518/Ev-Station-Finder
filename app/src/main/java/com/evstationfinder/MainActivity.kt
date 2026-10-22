@@ -81,6 +81,7 @@ fun MainAppContainer(viewModel: AppViewModel) {
     ) { paddingValues ->
         val modifier = Modifier.padding(paddingValues)
         when (val screen = currentScreen) {
+            is Screen.Login -> LoginScreen(viewModel = viewModel, modifier = modifier)
             is Screen.Home -> HomeScreen(viewModel = viewModel, modifier = modifier)
             is Screen.BookSlot -> BookSlotScreen(stationId = screen.stationId, viewModel = viewModel, modifier = modifier)
             is Screen.Payment -> PaymentScreen(viewModel = viewModel, modifier = modifier)

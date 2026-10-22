@@ -60,8 +60,20 @@ interface BookingDao {
 
 @Dao
 interface ProfileDao {
-    @Query("SELECT * FROM profile WHERE id = 1")
-    fun observe(): Flow<ProfileEntity?>
+    @Query("SELECT * FROM profile ORDER BY id ASC")
+    fun observeAll(): Flow<List<ProfileEntity>>
+
+    @Query("SELECT * FROM profile WHERE isActive = 1 LIMIT 1")
+    fun observeActive(): Flow<ProfileEntity?>
+
+    @Query("SELECT COUNT(*) FROM profile")
+    suspend fun count(): Int
+
+    @Query("UPDATE profile SET isActive = 0")
+    suspend fun clearActive()
+
+    @Query("UPDATE profile SET isActive = 1 WHERE id = :id")
+    suspend fun setActive(id: Int)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun save(profile: ProfileEntity)
@@ -69,7 +81,7 @@ interface ProfileDao {
 
 @Database(
     entities = [StationEntity::class, VehicleEntity::class, ProfileEntity::class, BookingEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -86,7 +98,9 @@ abstract class AppDatabase : RoomDatabase() {
                 context.applicationContext,
                 AppDatabase::class.java,
                 "ev_station_finder.db"
-            ).build().also { instance = it }
+            )
+            .fallbackToDestructiveMigration()
+            .build().also { instance = it }
         }
     }
 }

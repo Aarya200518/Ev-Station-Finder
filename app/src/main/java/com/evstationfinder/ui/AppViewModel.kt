@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 sealed class Screen {
+    object Login : Screen()
     object Home : Screen()
     data class BookSlot(val stationId: String) : Screen()
     object Payment : Screen()
@@ -33,8 +34,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val searchQuery = MutableStateFlow("")
     val selectedConnectorFilter = MutableStateFlow("All")
 
-    val profile: StateFlow<ProfileEntity?> = repository.profile
+    val profile: StateFlow<ProfileEntity?> = repository.activeProfile
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val allProfiles: StateFlow<List<ProfileEntity>> = repository.allProfiles
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val stations: StateFlow<List<StationEntity>> = combine(
         repository.stations, profile, searchQuery, selectedConnectorFilter
@@ -105,13 +109,49 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun loginAs(profileId: Int) {
+        viewModelScope.launch {
+            repository.loginProfile(profileId)
+            currentScreen.value = Screen.Home
+            activeTab.value = "home"
+        }
+    }
+
+    fun createAndLogin(name: String, email: String, phone: String, location: String) {
+        viewModelScope.launch {
+            repository.createAndLoginProfile(name, email, phone, location)
+            currentScreen.value = Screen.Home
+            activeTab.value = "home"
+        }
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            repository.logout()
+            currentScreen.value = Screen.Login
+        }
+    }
+
+    fun openLoginScreen() {
+        currentScreen.value = Screen.Login
+    }
+
     fun selectLocation(newLocation: String) {
         viewModelScope.launch {
             val current = profile.value
-            val name = current?.name ?: "Aarav Mehta"
-            val email = current?.email ?: "aarav.mehta@email.com"
-            val phone = current?.phone ?: "+91 98765 43210"
-            repository.saveProfile(ProfileEntity(id = 1, name = name, email = email, phone = phone, savedLocation = newLocation))
+            if (current != null) {
+                repository.saveProfile(current.copy(savedLocation = newLocation))
+            } else {
+                repository.saveProfile(
+                    ProfileEntity(
+                        name = "Aarav Mehta",
+                        email = "aarav.mehta@email.com",
+                        phone = "+91 98765 43210",
+                        savedLocation = newLocation,
+                        isActive = true
+                    )
+                )
+            }
         }
     }
 
@@ -162,7 +202,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateProfile(name: String, email: String, phone: String, savedLocation: String) {
         viewModelScope.launch {
-            repository.saveProfile(ProfileEntity(id = 1, name = name, email = email, phone = phone, savedLocation = savedLocation))
+            val current = profile.value
+            val id = current?.id ?: 0
+            repository.saveProfile(
+                ProfileEntity(
+                    id = id,
+                    name = name,
+                    email = email,
+                    phone = phone,
+                    savedLocation = savedLocation,
+                    isActive = true
+                )
+            )
         }
     }
 
