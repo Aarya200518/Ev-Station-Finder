@@ -33,11 +33,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val searchQuery = MutableStateFlow("")
     val selectedConnectorFilter = MutableStateFlow("All")
 
+    val profile: StateFlow<ProfileEntity?> = repository.profile
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     val stations: StateFlow<List<StationEntity>> = combine(
-        repository.stations, searchQuery, selectedConnectorFilter
-    ) { list, query, filter ->
-        list.filter { station ->
-            val matchesQuery = station.name.contains(query, ignoreCase = true) ||
+        repository.stations, profile, searchQuery, selectedConnectorFilter
+    ) { list, userProfile, query, filter ->
+        val userLocation = userProfile?.savedLocation ?: "Bandra Kurla Complex, Mumbai"
+
+        list.map { station ->
+            val isDirectMatch = userLocation.split(",", " ").filter { it.length > 2 }.any { part ->
+                station.address.contains(part.trim(), ignoreCase = true) || station.name.contains(part.trim(), ignoreCase = true)
+            }
+            if (isDirectMatch) {
+                station.copy(distanceKm = (station.distanceKm * 0.3).coerceAtLeast(0.8))
+            } else {
+                station
+            }
+        }.filter { station ->
+            val matchesQuery = query.isEmpty() || station.name.contains(query, ignoreCase = true) ||
                     station.address.contains(query, ignoreCase = true)
             val matchesFilter = when (filter) {
                 "All" -> true
@@ -47,7 +61,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 else -> true
             }
             matchesQuery && matchesFilter
-        }
+        }.sortedWith(
+            compareBy<StationEntity> { station ->
+                val locationTokens = userLocation.split(",", " ").map { it.trim().lowercase() }.filter { it.length > 2 }
+                val matchesLocation = locationTokens.any { token ->
+                    station.address.lowercase().contains(token) || station.name.lowercase().contains(token)
+                }
+                if (matchesLocation) 0 else 1
+            }.thenBy { it.distanceKm }
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val allStations: StateFlow<List<StationEntity>> = repository.stations
@@ -58,9 +80,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     val bookings: StateFlow<List<BookingEntity>> = repository.bookings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val profile: StateFlow<ProfileEntity?> = repository.profile
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val currentScreen = MutableStateFlow<Screen>(Screen.Home)
     val activeTab = MutableStateFlow("home") // "home", "map", "bookings", "profile"
@@ -83,6 +102,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             "bookings" -> Screen.Bookings
             "profile" -> Screen.Profile
             else -> Screen.Home
+        }
+    }
+
+    fun selectLocation(newLocation: String) {
+        viewModelScope.launch {
+            val current = profile.value
+            val name = current?.name ?: "Aarav Mehta"
+            val email = current?.email ?: "aarav.mehta@email.com"
+            val phone = current?.phone ?: "+91 98765 43210"
+            repository.saveProfile(ProfileEntity(id = 1, name = name, email = email, phone = phone, savedLocation = newLocation))
         }
     }
 

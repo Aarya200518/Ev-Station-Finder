@@ -1,6 +1,7 @@
 package com.evstationfinder.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,8 +11,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
@@ -35,7 +38,103 @@ fun HomeScreen(
     val selectedFilter by viewModel.selectedConnectorFilter.collectAsState()
     val profile by viewModel.profile.collectAsState()
 
+    var showLocationModal by remember { mutableStateOf(false) }
+    var customLocationInput by remember(profile?.savedLocation) { mutableStateOf(profile?.savedLocation ?: "") }
+
+    val popularLocations = listOf(
+        "Bandra Kurla Complex, Mumbai",
+        "Worli & Lower Parel, Mumbai",
+        "Andheri West, Mumbai",
+        "Powai, Mumbai",
+        "Connaught Place, New Delhi",
+        "MG Road, Bengaluru",
+        "Hadapsar, Pune",
+        "Gachibowli, Hyderabad"
+    )
+
     val filterOptions = listOf("All", "CCS", "Type 2", "Fast (50kW+)")
+
+    if (showLocationModal) {
+        AlertDialog(
+            onDismissRequest = { showLocationModal = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.MyLocation, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Select Your Location", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Type custom location or select a popular area:", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                    OutlinedTextField(
+                        value = customLocationInput,
+                        onValueChange = { customLocationInput = it },
+                        placeholder = { Text("e.g. Andheri, Worli, Delhi, Pune...") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Text("Popular Areas:", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+
+                    LazyColumn(
+                        modifier = Modifier.height(200.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(popularLocations) { loc ->
+                            val isSelected = profile?.savedLocation == loc || customLocationInput == loc
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        customLocationInput = loc
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.LocationOn,
+                                        contentDescription = null,
+                                        tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = loc,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (customLocationInput.isNotBlank()) {
+                            viewModel.selectLocation(customLocationInput)
+                        }
+                        showLocationModal = false
+                    }
+                ) {
+                    Text("Update Location")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLocationModal = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     Column(
         modifier = modifier
@@ -58,7 +157,9 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(
+                        modifier = Modifier.clickable { showLocationModal = true }
+                    ) {
                         Text(
                             text = "Hello, ${profile?.name?.split(" ")?.firstOrNull() ?: "Driver"}",
                             fontSize = 20.sp,
@@ -74,9 +175,17 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = profile?.savedLocation ?: "Mumbai, India",
+                                text = profile?.savedLocation ?: "Bandra Kurla Complex, Mumbai",
                                 fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Change Location",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp)
                             )
                         }
                     }
@@ -154,8 +263,8 @@ fun HomeScreen(
 
         // Station Count Header
         Text(
-            text = "Nearby Charging Stations (${stations.size})",
-            fontSize = 16.sp,
+            text = "Charging Stations Near ${profile?.savedLocation?.split(",")?.firstOrNull() ?: "You"} (${stations.size})",
+            fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
@@ -169,7 +278,7 @@ fun HomeScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "No charging stations found matching your search.",
+                    text = "No charging stations found for '${profile?.savedLocation}'. Try changing location or search query.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 14.sp
                 )
@@ -294,7 +403,7 @@ fun StationCard(
                     color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
                     Text(
-                        text = "${station.distanceKm} km away",
+                        text = "${"%.1f".format(station.distanceKm)} km away",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -304,7 +413,7 @@ fun StationCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
 
             Spacer(modifier = Modifier.height(12.dp))
 
