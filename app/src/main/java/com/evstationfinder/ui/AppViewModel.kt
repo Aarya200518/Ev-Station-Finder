@@ -45,12 +45,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     ) { list, userProfile, query, filter ->
         val userLocation = userProfile?.savedLocation ?: "Bandra Kurla Complex, Mumbai"
 
+        val genericWords = setOf("mumbai", "india", "delhi", "east", "west", "road", "street", "near")
+        val locationTokens = userLocation.split(",", " ")
+            .map { it.trim().lowercase() }
+            .filter { it.length > 2 && !genericWords.contains(it) }
+
         list.map { station ->
-            val isDirectMatch = userLocation.split(",", " ").filter { it.length > 2 }.any { part ->
-                station.address.contains(part.trim(), ignoreCase = true) || station.name.contains(part.trim(), ignoreCase = true)
+            val isDirectMatch = locationTokens.any { token ->
+                station.address.lowercase().contains(token) || station.name.lowercase().contains(token)
             }
             if (isDirectMatch) {
-                station.copy(distanceKm = (station.distanceKm * 0.3).coerceAtLeast(0.8))
+                station.copy(distanceKm = (station.distanceKm * 0.2).coerceIn(0.5, 2.5))
             } else {
                 station
             }
@@ -67,7 +72,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             matchesQuery && matchesFilter
         }.sortedWith(
             compareBy<StationEntity> { station ->
-                val locationTokens = userLocation.split(",", " ").map { it.trim().lowercase() }.filter { it.length > 2 }
                 val matchesLocation = locationTokens.any { token ->
                     station.address.lowercase().contains(token) || station.name.lowercase().contains(token)
                 }
