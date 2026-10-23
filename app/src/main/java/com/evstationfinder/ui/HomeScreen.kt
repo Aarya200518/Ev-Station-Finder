@@ -9,10 +9,13 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EvStation
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
@@ -41,6 +44,7 @@ fun HomeScreen(
     val profile by viewModel.profile.collectAsState()
 
     var showLocationModal by remember { mutableStateOf(false) }
+    var selectedStationForDetails by remember { mutableStateOf<StationEntity?>(null) }
     var customLocationInput by remember(profile?.savedLocation) { mutableStateOf(profile?.savedLocation ?: "") }
 
     val popularLocations = listOf(
@@ -55,6 +59,19 @@ fun HomeScreen(
     )
 
     val filterOptions = listOf("All", "CCS", "Type 2", "Fast (50kW+)")
+
+    // Station Details Dialog
+    selectedStationForDetails?.let { station ->
+        StationDetailsDialog(
+            station = station,
+            onDismiss = { selectedStationForDetails = null },
+            onReserveSlotClick = {
+                val defaultVehicle = viewModel.vehicles.value.firstOrNull()?.id ?: "nexon"
+                viewModel.startBooking(station.id, defaultVehicle)
+                selectedStationForDetails = null
+            }
+        )
+    }
 
     if (showLocationModal) {
         AlertDialog(
@@ -330,6 +347,7 @@ fun HomeScreen(
                 items(stations) { station ->
                     StationCard(
                         station = station,
+                        onCardClick = { selectedStationForDetails = station },
                         onBookClick = {
                             val defaultVehicle = viewModel.vehicles.value.firstOrNull()?.id ?: "nexon"
                             viewModel.startBooking(station.id, defaultVehicle)
@@ -344,6 +362,7 @@ fun HomeScreen(
 @Composable
 fun StationCard(
     station: StationEntity,
+    onCardClick: () -> Unit,
     onBookClick: () -> Unit
 ) {
     Card(
@@ -352,7 +371,7 @@ fun StationCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onBookClick() }
+            .clickable { onCardClick() }
     ) {
         Column(
             modifier = Modifier
@@ -407,7 +426,7 @@ fun StationCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Badges Row: Connector, Distance, Available Slots
+            // Badges Row: Connector, Distance, Hours
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -478,14 +497,221 @@ fun StationCard(
                     )
                 }
 
-                Button(
-                    onClick = onBookClick,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text("Book Slot", fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    IconButton(
+                        onClick = onCardClick,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Station Details",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Button(
+                        onClick = onBookClick,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text("Book Slot", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+fun StationDetailsDialog(
+    station: StationEntity,
+    onDismiss: () -> Unit,
+    onReserveSlotClick: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = station.name,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFFFF8E1)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFA000), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(text = station.rating.toString(), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF5D4037))
+                        }
+                    }
+                }
+
+                Text(
+                    text = station.address,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // Operating Hours & Status Badge
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.AccessTime,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = station.hours,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        if (station.isOpen) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFFE8F5E9)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(12.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Open Now", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Slot Capacity Bar
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Live Slot Capacity", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "${station.availableSlots}/${station.totalSlots} Slots Free",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (station.availableSlots > 2) Color(0xFF2E7D32) else Color(0xFFE65100)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    val progress = if (station.totalSlots > 0) station.availableSlots.toFloat() / station.totalSlots.toFloat() else 0f
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        color = if (station.availableSlots > 2) Color(0xFF2E7D32) else Color(0xFFE65100),
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                }
+
+                // Charger Specs & Tariff
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Connector Type:", fontSize = 13.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Text(station.connector, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Power Rating:", fontSize = 13.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Text("${station.powerKw} kW Fast Charger", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Charging Tariff:", fontSize = 13.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Text("₹${station.pricePerKwh} / kWh", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                    }
+                }
+
+                // Amenities List
+                if (station.amenities.isNotBlank()) {
+                    Column {
+                        Text("Available Amenities & Facilities:", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        val amenitiesList = station.amenities.split("|")
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(amenitiesList) { amenity ->
+                                SuggestionChip(
+                                    onClick = {},
+                                    label = { Text(amenity, fontSize = 12.sp) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onReserveSlotClick,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Proceed to Reserve Slot", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
 }
