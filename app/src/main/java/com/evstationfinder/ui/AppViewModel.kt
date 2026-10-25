@@ -27,6 +27,7 @@ sealed class Screen {
     object Profile : Screen()
     object Map : Screen()
     object RangePlanner : Screen()
+    object ChargingCost : Screen()
 }
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -145,6 +146,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         currentScreen.value = Screen.RangePlanner
     }
 
+    fun openChargingCost() {
+        currentScreen.value = Screen.ChargingCost
+    }
+
     fun selectLocation(newLocation: String) {
         viewModelScope.launch {
             val current = profile.value
@@ -230,6 +235,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         when (currentScreen.value) {
             is Screen.BookSlot -> currentScreen.value = Screen.Home
             is Screen.RangePlanner -> currentScreen.value = Screen.Home
+            is Screen.ChargingCost -> currentScreen.value = Screen.Home
             is Screen.Payment -> {
                 val draft = currentDraft.value
                 if (draft != null) {
