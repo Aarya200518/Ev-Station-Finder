@@ -26,6 +26,7 @@ sealed class Screen {
     object Bookings : Screen()
     object Profile : Screen()
     object Map : Screen()
+    object RangePlanner : Screen()
 }
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -140,6 +141,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         currentScreen.value = Screen.Login
     }
 
+    fun openRangePlanner() {
+        currentScreen.value = Screen.RangePlanner
+    }
+
     fun selectLocation(newLocation: String) {
         viewModelScope.launch {
             val current = profile.value
@@ -224,6 +229,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun navigateBack() {
         when (currentScreen.value) {
             is Screen.BookSlot -> currentScreen.value = Screen.Home
+            is Screen.RangePlanner -> currentScreen.value = Screen.Home
             is Screen.Payment -> {
                 val draft = currentDraft.value
                 if (draft != null) {

@@ -89,6 +89,7 @@ fun MainAppContainer(viewModel: AppViewModel) {
             is Screen.Bookings -> BookingsScreen(viewModel = viewModel, modifier = modifier)
             is Screen.Profile -> ProfileScreen(viewModel = viewModel, modifier = modifier)
             is Screen.Map -> MapScreen(viewModel = viewModel, modifier = modifier)
+            is Screen.RangePlanner -> RangePlannerScreen(viewModel = viewModel, modifier = modifier)
         }
     }
 }
