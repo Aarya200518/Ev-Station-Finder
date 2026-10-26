@@ -10,7 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -31,17 +31,19 @@ fun SmartStationRecommendationsScreen(
 ) {
     val vehicles by viewModel.vehicles.collectAsState()
     val stations by viewModel.allStations.collectAsState()
+    val profile by viewModel.profile.collectAsState()
 
     var selectedVehicleId by remember(vehicles) { mutableStateOf(vehicles.firstOrNull()?.id ?: "") }
     var selectedSortOption by remember { mutableStateOf("Recommended") }
 
     val selectedVehicle = vehicles.find { it.id == selectedVehicleId } ?: vehicles.firstOrNull()
+    val userLocation = profile?.savedLocation ?: "Bandra Kurla Complex, Mumbai"
 
     val sortOptions = listOf("Recommended", "Nearest", "Lowest Price", "Highest Power")
 
-    // Compute recommendations using RecommendationEngine
-    val recommendations: List<StationRecommendation> = remember(stations, selectedVehicle) {
-        RecommendationEngine.computeRecommendations(stations, selectedVehicle)
+    // Compute recommendations using RecommendationEngine with user location
+    val recommendations: List<StationRecommendation> = remember(stations, selectedVehicle, userLocation) {
+        RecommendationEngine.computeRecommendations(stations, selectedVehicle, userLocation)
     }
 
     val sortedRecommendations = remember(recommendations, selectedSortOption) {
@@ -72,7 +74,7 @@ fun SmartStationRecommendationsScreen(
                 .padding(paddingValues)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Subtitle Header
+            // Location & Subtitle Header
             Surface(
                 color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 2.dp,
@@ -81,15 +83,24 @@ fun SmartStationRecommendationsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 14.dp)
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "Find the right charging station for your EV.",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Recommendations near $userLocation",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
 
                     // Vehicle Selection
                     if (vehicles.isEmpty()) {
@@ -114,8 +125,6 @@ fun SmartStationRecommendationsScreen(
                             }
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(12.dp))
 
                     // Sort Chips
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -146,7 +155,7 @@ fun SmartStationRecommendationsScreen(
                     ) {
                         Box(modifier = Modifier.padding(24.dp), contentAlignment = Alignment.Center) {
                             Text(
-                                text = "No charging stations available.",
+                                text = "No charging stations available near $userLocation.",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 14.sp
                             )

@@ -20,11 +20,32 @@ enum class RecommendationCategory {
 
 object RecommendationEngine {
 
+    /**
+     * Evaluates compatibility, location relevance, and ranks stations for the given vehicle and user location.
+     * Scoring factors:
+     * - Location matching: Stations matching the user's city/area receive a strong priority bonus. Out-of-city stations are penalized.
+     * - Compatibility: Must match connector (e.g., CCS, Type 2, CHAdeMO).
+     * - Distance: Lower distanceKm gets higher score.
+     * - Price: Lower pricePerKwh gets higher score.
+     * - Power: Higher powerKw gets higher score.
+     * - Availability: Open status and available slots boost score.
+     */
     fun computeRecommendations(
         stations: List<StationEntity>,
-        vehicle: VehicleEntity?
+        vehicle: VehicleEntity?,
+        userLocation: String?
     ): List<StationRecommendation> {
         if (stations.isEmpty()) return emptyList()
+
+        val location = userLocation ?: "Bandra Kurla Complex, Mumbai"
+        val genericWords = setOf("india", "east", "west", "road", "street", "near")
+        val locationTokens = location.split(",", " ")
+            .map { it.trim().lowercase() }
+            .filter { it.length > 2 && !genericWords.contains(it) }
+
+        // Extract city token specifically (e.g., mumbai, delhi, bengaluru, pune, hyderabad)
+        val knownCities = setOf("mumbai", "delhi", "bengaluru", "pune", "hyderabad")
+        val userCity = location.split(",", " ").map { it.trim().lowercase() }.firstOrNull { knownCities.contains(it) } ?: "mumbai"
 
         val evaluated = stations.map { station ->
             val vConnector = vehicle?.connector?.trim()?.lowercase() ?: ""
@@ -36,9 +57,22 @@ object RecommendationEngine {
                 else -> false
             }
 
-            val note = if (isCompatible) "Compatible (${station.connector})" else "Connector mismatch (${station.connector})"
+            val stationAddrLower = station.address.lowercase()
+            val stationNameLower = station.name.lowercase()
 
-            Triple(station, isCompatible, note)
+            val isLocationMatch = locationTokens.any { token ->
+                stationAddrLower.contains(token) || stationNameLower.contains(token)
+            }
+
+            val isCityMatch = stationAddrLower.contains(userCity) || stationNameLower.contains(userCity)
+
+            val note = when {
+                !isCompatible -> "Connector mismatch (${station.connector})"
+                !isCityMatch && !isLocationMatch -> "Located outside $userCity"
+                else -> "Compatible & nearby (${station.connector})"
+            }
+
+            Triple(station, isCompatible, Triple(isLocationMatch, isCityMatch, note))
         }
 
         val validStations = evaluated.map { it.first }
@@ -46,11 +80,21 @@ object RecommendationEngine {
         val maxPrice = validStations.maxOfOrNull { it.pricePerKwh.toDouble() }?.takeIf { it > 0.0 } ?: 20.0
         val maxPower = validStations.maxOfOrNull { it.powerKw.toDouble() }?.takeIf { it > 0.0 } ?: 150.0
 
-        val scored = evaluated.map { (station, isCompatible, note) ->
+        val scored = evaluated.map { (station, isCompatible, meta) ->
+            val (isLocationMatch, isCityMatch, note) = meta
             var score = 0.0
 
             if (isCompatible) {
                 score += 50.0
+
+                // Location relevance scoring
+                if (isLocationMatch) {
+                    score += 150.0 // Strong area match bonus (e.g., Andheri / BKC)
+                } else if (isCityMatch) {
+                    score += 50.0  // Same city bonus (e.g., Mumbai)
+                } else {
+                    score -= 300.0 // Heavy penalty for out-of-city stations
+                }
 
                 val distNorm = (1.0 - (station.distanceKm / maxDist).coerceIn(0.0, 1.0)) * 25.0
                 score += distNorm
@@ -64,19 +108,29 @@ object RecommendationEngine {
                 if (station.isOpen) score += 5.0
                 if (station.availableSlots > 0) score += (station.availableSlots.toDouble() / station.totalSlots.coerceAtLeast(1)) * 5.0
             } else {
-                score = -100.0
+                score = -600.0
             }
 
+            // Consider compatible if connector matches and either location or city matches (or fallback if none match)
+            val passesLocationFilter = isLocationMatch || isCityMatch
             StationRecommendation(
                 station = station,
-                isCompatible = isCompatible,
-                compatibilityNote = note,
+                isCompatible = isCompatible && passesLocationFilter,
+                compatibilityNote = if (!isCompatible) note else if (!passesLocationFilter) "Outside selected region ($userCity)" else note,
                 score = score,
                 categories = emptyList()
             )
         }
 
-        val sorted = scored.sortedByDescending { it.score }
+        // Fallback if strict location filtering leaves nothing
+        val hasAnyValid = scored.any { it.isCompatible }
+        val finalScored = if (!hasAnyValid) {
+            scored.map { it.copy(isCompatible = it.score > -400.0) }
+        } else {
+            scored
+        }
+
+        val sorted = finalScored.sortedByDescending { it.score }
         val compatibleSorted = sorted.filter { it.isCompatible }
 
         val bestMatchId = compatibleSorted.firstOrNull()?.station?.id
