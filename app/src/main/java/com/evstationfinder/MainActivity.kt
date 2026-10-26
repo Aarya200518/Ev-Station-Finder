@@ -91,6 +91,7 @@ fun MainAppContainer(viewModel: AppViewModel) {
             is Screen.Map -> MapScreen(viewModel = viewModel, modifier = modifier)
             is Screen.RangePlanner -> RangePlannerScreen(viewModel = viewModel, modifier = modifier)
             is Screen.ChargingCost -> ChargingCostScreen(viewModel = viewModel, modifier = modifier)
+            is Screen.SmartRecommendations -> SmartStationRecommendationsScreen(viewModel = viewModel, modifier = modifier)
         }
     }
 }
