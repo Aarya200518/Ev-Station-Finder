@@ -65,6 +65,18 @@ data class BookingEntity(
     val createdAt: Long = System.currentTimeMillis()
 )
 
+@Entity(tableName = "charging_sessions")
+data class ChargingSessionEntity(
+    @PrimaryKey val id: String,
+    val stationName: String,
+    val vehicleName: String,
+    val date: String,
+    val timestamp: Long,
+    val energyKwh: Double,
+    val cost: Int,
+    val status: String = "Completed"
+)
+
 data class BookingDraft(
     val stationId: String,
     val vehicleId: String,

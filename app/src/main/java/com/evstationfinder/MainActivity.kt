@@ -93,6 +93,7 @@ fun MainAppContainer(viewModel: AppViewModel) {
             is Screen.ChargingCost -> ChargingCostScreen(viewModel = viewModel, modifier = modifier)
             is Screen.SmartRecommendations -> SmartStationRecommendationsScreen(viewModel = viewModel, modifier = modifier)
             is Screen.ConnectorAvailability -> ConnectorAvailabilityScreen(viewModel = viewModel, modifier = modifier)
+            is Screen.ChargingAnalytics -> ChargingAnalyticsScreen(viewModel = viewModel, modifier = modifier)
         }
     }
 }

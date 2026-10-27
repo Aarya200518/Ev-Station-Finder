@@ -6,6 +6,7 @@ class AppRepository(private val database: AppDatabase) {
     val stations: Flow<List<StationEntity>> = database.stationDao().observeAll()
     val vehicles: Flow<List<VehicleEntity>> = database.vehicleDao().observeAll()
     val bookings: Flow<List<BookingEntity>> = database.bookingDao().observeAll()
+    val chargingSessions: Flow<List<ChargingSessionEntity>> = database.chargingSessionDao().observeAll()
     val activeProfile: Flow<ProfileEntity?> = database.profileDao().observeActive()
     val allProfiles: Flow<List<ProfileEntity>> = database.profileDao().observeAll()
 
@@ -147,6 +148,7 @@ class AppRepository(private val database: AppDatabase) {
     }
 
     suspend fun saveProfile(profile: ProfileEntity) = database.profileDao().save(profile)
+    suspend fun recordChargingSession(session: ChargingSessionEntity) = database.chargingSessionDao().insert(session)
 
     companion object {
         fun estimate(draft: BookingDraft, station: StationEntity, vehicle: VehicleEntity): ChargingEstimate {

@@ -8,6 +8,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -79,9 +81,34 @@ interface ProfileDao {
     suspend fun save(profile: ProfileEntity)
 }
 
+@Dao
+interface ChargingSessionDao {
+    @Query("SELECT * FROM charging_sessions ORDER BY timestamp DESC")
+    fun observeAll(): Flow<List<ChargingSessionEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(session: ChargingSessionEntity)
+}
+
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            "CREATE TABLE IF NOT EXISTS charging_sessions (" +
+                    "id TEXT PRIMARY KEY NOT NULL, " +
+                    "stationName TEXT NOT NULL, " +
+                    "vehicleName TEXT NOT NULL, " +
+                    "date TEXT NOT NULL, " +
+                    "timestamp INTEGER NOT NULL, " +
+                    "energyKwh REAL NOT NULL, " +
+                    "cost INTEGER NOT NULL, " +
+                    "status TEXT NOT NULL)"
+        )
+    }
+}
+
 @Database(
-    entities = [StationEntity::class, VehicleEntity::class, ProfileEntity::class, BookingEntity::class],
-    version = 2,
+    entities = [StationEntity::class, VehicleEntity::class, ProfileEntity::class, BookingEntity::class, ChargingSessionEntity::class],
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -89,6 +116,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun vehicleDao(): VehicleDao
     abstract fun bookingDao(): BookingDao
     abstract fun profileDao(): ProfileDao
+    abstract fun chargingSessionDao(): ChargingSessionDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
@@ -99,6 +127,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 "ev_station_finder.db"
             )
+            .addMigrations(MIGRATION_2_3)
             .fallbackToDestructiveMigration()
             .build().also { instance = it }
         }

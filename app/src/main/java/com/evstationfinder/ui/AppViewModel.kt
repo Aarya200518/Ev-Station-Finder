@@ -7,6 +7,7 @@ import com.evstationfinder.data.AppDatabase
 import com.evstationfinder.data.AppRepository
 import com.evstationfinder.data.BookingDraft
 import com.evstationfinder.data.BookingEntity
+import com.evstationfinder.data.ChargingSessionEntity
 import com.evstationfinder.data.ProfileEntity
 import com.evstationfinder.data.StationEntity
 import com.evstationfinder.data.VehicleEntity
@@ -30,6 +31,7 @@ sealed class Screen {
     object ChargingCost : Screen()
     object SmartRecommendations : Screen()
     object ConnectorAvailability : Screen()
+    object ChargingAnalytics : Screen()
 }
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -91,6 +93,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val bookings: StateFlow<List<BookingEntity>> = repository.bookings
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val chargingSessions: StateFlow<List<ChargingSessionEntity>> = repository.chargingSessions
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val currentScreen = MutableStateFlow<Screen>(Screen.Home)
@@ -158,6 +163,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openConnectorAvailability() {
         currentScreen.value = Screen.ConnectorAvailability
+    }
+
+    fun openChargingAnalytics() {
+        currentScreen.value = Screen.ChargingAnalytics
     }
 
     fun selectLocation(newLocation: String) {
@@ -248,6 +257,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             is Screen.ChargingCost -> currentScreen.value = Screen.Home
             is Screen.SmartRecommendations -> currentScreen.value = Screen.Home
             is Screen.ConnectorAvailability -> currentScreen.value = Screen.Home
+            is Screen.ChargingAnalytics -> currentScreen.value = Screen.Home
             is Screen.Payment -> {
                 val draft = currentDraft.value
                 if (draft != null) {
